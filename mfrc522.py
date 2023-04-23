@@ -209,21 +209,31 @@ class MFRC522:
 		(stat, recv, _) = self._tocard(0x0C, data)
 		return recv if stat == self.OK else None
 
+##below is a new code to write on RFID. The code change includes confirmation of information being written to RFID 
+## OR if error occurs while writing
 	def write(self, addr, data):
-
-		buf = [0xA0, addr]
-		buf += self._crc(buf)
-		(stat, recv, bits) = self._tocard(0x0C, buf)
-
-		if not (stat == self.OK) or not (bits == 4) or not ((recv[0] & 0x0F) == 0x0A):
-			stat = self.ERR
-		else:
+		buff = []
+		buff.append(self.PICC_WRITE)
+		buff.append(addr)
+		crc = self.CalulateCRC(buff)
+		buff.append(crc[0])
+		buff.append(crc[1])
+		(status, backData, backLen) = self.MFRC522_ToCard(self.PCD_TRANSCEIVE, buff)
+		if not(status == self.MI_OK) or not(backLen == 4) or not((backData[0] & 0x0F) == 0x0A):
+			status = self.MI_ERR
+		
+		print("%s backdata &0x0F == 0x0A %s" % (backLen, backData[0]&0x0F))
+		if status == self.MI_OK:
+			i = 0
 			buf = []
-			for i in range(16):
+			while i < 16:
 				buf.append(data[i])
-			buf += self._crc(buf)
-			(stat, recv, bits) = self._tocard(0x0C, buf)
-			if not (stat == self.OK) or not (bits == 4) or not ((recv[0] & 0x0F) == 0x0A):
-				stat = self.ERR
-
-		return stat
+				i = i + 1
+			crc = self.CalulateCRC(buf)
+			buf.append(crc[0])
+			buf.append(crc[1])
+			(status, backData, backLen) = self.MFRC522_ToCard(self.PCD_TRANSCEIVE,buf)
+			if not(status == self.MI_OK) or not(backLen == 4) or not((backData[0] & 0x0F) == 0x0A):
+				print("Error while writing")
+			if status == self.MI_OK:
+				print("Data written")
